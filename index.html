@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企劃組請款小工具｜光田綜合醫院</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:       #006341;
+      --brand-light: #007D53;
+      --brand-bg:    #EAF5EE;
+      --brand-bd:    #B3D9C5;
+      --ci-green:    #6EC300;
+      --ci-blue:     #00AAC8;
+      --bg:          #F3F9F6;
+      --border:      #DDE8E3;
+      --text:        #1A2820;
+      --text-sub:    #5A7A6A;
+      --text-muted:  #90A89E;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      background: var(--brand);
+      color: white;
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .app-header h1 { font-size: 16px; font-weight: 600; }
+    .header-sub { font-size: 12px; opacity: 0.65; margin-left: 2px; }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 32px;
+      position: sticky;
+      top: 60px;
+      z-index: 90;
+    }
+    .tab-btn {
+      padding: 16px 24px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text-sub); }
+    .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+    /* ── Main / tabs ── */
+    .main { max-width: 1100px; margin: 0 auto; padding: 32px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      background: white;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      user-select: none;
+    }
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--brand);
+      background: var(--brand-bg);
+    }
+    .upload-zone.success {
+      border-style: solid;
+      border-color: var(--ci-green);
+      background: #F0FAE8;
+    }
+    .upload-zone.error {
+      border-style: solid;
+      border-color: #dc2626;
+      background: #fef2f2;
+    }
+    .upload-icon { color: var(--text-muted); margin-bottom: 12px; }
+    .upload-zone.success .upload-icon { color: var(--ci-green); }
+    .upload-zone.error .upload-icon { color: #dc2626; }
+    .upload-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .upload-hint { font-size: 13px; color: var(--text-muted); }
+    .upload-success-info { font-size: 13px; font-weight: 500; color: #16a34a; margin-top: 8px; min-height: 18px; }
+    .upload-error-info { font-size: 13px; color: #dc2626; margin-top: 8px; min-height: 18px; }
+
+    /* ── Section title ── */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .section-title svg { color: var(--brand); flex-shrink: 0; }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 28px 0; }
+
+    /* ── Search ── */
+    .search-wrap { position: relative; margin-bottom: 14px; }
+    .search-wrap > svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 12px 16px 12px 42px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      background: white;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: var(--brand); }
+    .search-input:disabled { background: var(--bg); cursor: not-allowed; color: var(--text-muted); }
+
+    /* ── Results ── */
+    .results-info { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+
+    .results-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .result-row {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: box-shadow 0.15s;
+    }
+    .result-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+    .result-main { flex: 1; min-width: 0; }
+    .result-id {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      font-family: 'Inter', monospace;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .result-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .result-meta span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .btn-copy-id {
+      background: var(--brand-bg);
+      color: var(--brand);
+      border: 1px solid var(--brand-bd);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-copy-id:hover { background: var(--brand-bd); }
+    .btn-copy-id.copied {
+      background: var(--ci-green);
+      color: white;
+      border-color: var(--ci-green);
+    }
+
+    .empty-results {
+      text-align: center;
+      padding: 56px 20px;
+      color: var(--text-muted);
+    }
+    .empty-results svg { margin-bottom: 12px; opacity: 0.3; }
+    .empty-results p { font-size: 14px; }
+
+    /* ── Module 2 layout ── */
+    .merge-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 800px) { .merge-grid { grid-template-columns: 1fr; } }
+
+    /* ── Image thumbnails ── */
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .img-thumb {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      aspect-ratio: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .img-order {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      background: rgba(0,0,0,0.55);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .img-remove {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(0,0,0,0.55);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .img-remove:hover { background: #dc2626; }
+
+    /* ── Merge actions ── */
+    .merge-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .merge-status { font-size: 13px; color: var(--text-sub); }
+    .merge-status.ok { color: #16a34a; }
+    .merge-status.err { color: #dc2626; }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background: var(--brand);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-weight: 500;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--brand-light); }
+    .btn-primary:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1A2820;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      z-index: 300;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .version {
+      position: fixed;
+      bottom: 12px;
+      right: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<!-- ─── Header ─── -->
+<header class="app-header">
+  <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+  <h1>企劃組請款小工具<span class="header-sub">｜光田綜合醫院</span></h1>
+</header>
+
+<!-- ─── Tab bar ─── -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="tab-search">
+    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    業務支援單搜尋
+  </button>
+  <button class="tab-btn" data-tab="tab-merge">
+    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    請款單＋佐證圖合併
+  </button>
+</nav>
+
+<!-- ─── Main ─── -->
+<main class="main">
+
+  <!-- ════ Tab 1：業務支援單搜尋 ════ -->
+  <div class="tab-content active" id="tab-search">
+
+    <div class="section-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <line x1="3" y1="9" x2="21" y2="9"/>
+        <line x1="3" y1="15" x2="21" y2="15"/>
+        <line x1="9" y1="3" x2="9" y2="21"/>
+      </svg>
+      上傳業務支援單 Excel
+    </div>
+
+    <div class="upload-zone" id="excel-zone">
+      <div class="upload-icon" id="excel-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <polyline points="16 13 12 9 8 13"/>
+          <line x1="12" y1="9" x2="12" y2="17"/>
+        </svg>
+      </div>
+      <div class="upload-title">點擊或拖曳 Excel 檔案至此</div>
+      <div class="upload-hint">支援 .xlsx / .xls 格式，自動讀取第一個工作表</div>
+      <div class="upload-success-info" id="excel-success-info"></div>
+      <div class="upload-error-info" id="excel-error-info"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      搜尋業務支援單
+    </div>
+
+    <div class="search-wrap">
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="search-input" id="excel-search" type="text"
+             placeholder="輸入單號、申請單位、品項、日期等關鍵字…" disabled>
+    </div>
+
+    <div class="results-info" id="results-info">請先上傳 Excel 檔案以啟用搜尋</div>
+    <div class="results-list" id="results-list"></div>
+
+  </div>
+
+  <!-- ════ Tab 2：請款單＋佐證圖合併 ════ -->
+  <div class="tab-content" id="tab-merge">
+
+    <div class="merge-grid">
+
+      <!-- Left: PDF -->
+      <div>
+        <div class="section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          請款單 PDF
+        </div>
+        <div class="upload-zone" id="pdf-zone">
+          <div class="upload-icon" id="pdf-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <polyline points="16 13 12 9 8 13"/>
+              <line x1="12" y1="9" x2="12" y2="17"/>
+            </svg>
+          </div>
+          <div class="upload-title">點擊或拖曳請款單 PDF</div>
+          <div class="upload-hint">從醫院費用請款系統下載的 PDF 檔案</div>
+          <div class="upload-success-info" id="pdf-success-info"></div>
+          <div class="upload-error-info" id="pdf-error-info"></div>
+        </div>
+      </div>
+
+      <!-- Right: Images -->
+      <div>
+        <div class="section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          佐證圖片
+        </div>
+        <div class="upload-zone" id="img-zone">
+          <div class="upload-icon" id="img-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="upload-title" id="img-upload-title">點擊或拖曳佐證圖片</div>
+          <div class="upload-hint">支援 JPG / PNG，可多選，合併後排列於請款單下方</div>
+          <div class="upload-success-info" id="img-success-info"></div>
+          <div class="upload-error-info" id="img-error-info"></div>
+        </div>
+        <div class="img-grid" id="img-grid"></div>
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="merge-actions">
+      <button class="btn-primary" id="btn-merge" disabled>
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        合併並下載
+      </button>
+      <div class="merge-status" id="merge-status">請上傳請款單 PDF 及至少一張佐證圖片</div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- Hidden file inputs -->
+<input type="file" id="excel-input" accept=".xlsx,.xls" style="display:none">
+<input type="file" id="pdf-input" accept=".pdf" style="display:none">
+<input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
+
+<div class="toast" id="toast"></div>
+<span class="version">v1.0</span>
+
+<script>
+// ── Utilities ──────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function readAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = reject;
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); cb(); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Upload zone helpers ────────────────────────────────────────────────────────
+
+function makeDropZone(zoneId, inputId, onFiles) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', e => {
+    if (e.target.files.length) onFiles(e.target.files);
+    e.target.value = '';
+  });
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', e => {
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+  });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) onFiles(e.dataTransfer.files);
+  });
+}
+
+function setZoneSuccess(zoneId, iconId, successId, errorId, msg) {
+  const zone = document.getElementById(zoneId);
+  zone.classList.remove('error');
+  zone.classList.add('success');
+  document.getElementById(iconId).innerHTML = `
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>`;
+  document.getElementById(successId).textContent = msg;
+  document.getElementById(errorId).textContent = '';
+}
+
+function setZoneError(zoneId, successId, errorId, msg) {
+  const zone = document.getElementById(zoneId);
+  zone.classList.remove('success');
+  zone.classList.add('error');
+  document.getElementById(successId).textContent = '';
+  document.getElementById(errorId).textContent = msg;
+}
+
+// ── Module 1: Excel search ─────────────────────────────────────────────────────
+
+let excelRows = [];
+let excelHeaders = [];
+
+makeDropZone('excel-zone', 'excel-input', files => handleExcelFile(files[0]));
+
+function handleExcelFile(file) {
+  if (!/\.xlsx?$/i.test(file.name)) {
+    setZoneError('excel-zone', 'excel-success-info', 'excel-error-info', '請上傳 .xlsx 或 .xls 格式的 Excel 檔案');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (raw.length < 2) {
+        setZoneError('excel-zone', 'excel-success-info', 'excel-error-info', 'Excel 內容為空或僅含標題列');
+        return;
+      }
+      excelHeaders = raw[0].map(h => String(h ?? '').trim());
+      excelRows = raw.slice(1).filter(r => r.some(c => c !== ''));
+
+      setZoneSuccess('excel-zone', 'excel-icon', 'excel-success-info', 'excel-error-info',
+        `已載入：${file.name}（共 ${excelRows.length} 筆資料）`);
+
+      document.getElementById('excel-search').disabled = false;
+      document.getElementById('excel-search').focus();
+      renderExcelResults('');
+    } catch {
+      setZoneError('excel-zone', 'excel-success-info', 'excel-error-info', '解析失敗，請確認檔案格式是否正確');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderExcelResults(query) {
+  const q = query.toLowerCase().trim();
+  const infoEl = document.getElementById('results-info');
+  const listEl = document.getElementById('results-list');
+
+  if (!excelRows.length) {
+    infoEl.textContent = '請先上傳 Excel 檔案以啟用搜尋';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const filtered = q
+    ? excelRows.filter(row =>
+        row.slice(0, 8).some(cell => String(cell ?? '').toLowerCase().includes(q))
+      )
+    : excelRows;
+
+  const shown = filtered.slice(0, 80);
+
+  if (!q) {
+    infoEl.textContent = `共 ${excelRows.length} 筆，請輸入關鍵字搜尋（例如單號、申請單位）`;
+  } else {
+    infoEl.textContent = `找到 ${filtered.length} 筆${filtered.length > 80 ? '，顯示前 80 筆' : ''}`;
+  }
+
+  if (!shown.length) {
+    listEl.innerHTML = `
+      <div class="empty-results">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <p>找不到符合「${esc(query)}」的資料</p>
+      </div>`;
+    return;
+  }
+
+  const metaCols = Array.from({ length: Math.min(excelHeaders.length - 1, 4) }, (_, i) => i + 1);
+
+  listEl.innerHTML = shown.map(row => {
+    const id = String(row[0] ?? '').trim();
+    const metaParts = metaCols.map(i => {
+      const label = excelHeaders[i] || `欄${i + 1}`;
+      const val = String(row[i] ?? '').trim();
+      return val ? `<span title="${esc(label)}">${esc(label)}：${esc(val)}</span>` : '';
+    }).filter(Boolean).join('');
+
+    return `
+      <div class="result-row">
+        <div class="result-main">
+          <div class="result-id">${esc(id) || '（空白）'}</div>
+          ${metaParts ? `<div class="result-meta">${metaParts}</div>` : ''}
+        </div>
+        <button class="btn-copy-id" data-val="${esc(id)}">
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          複製單號
+        </button>
+      </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.btn-copy-id').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.val;
+      const onCopied = () => {
+        btn.classList.add('copied');
+        btn.innerHTML = `
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          ✓ 已複製`;
+        showToast(`已複製單號：${val}`);
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = `
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            複製單號`;
+        }, 2000);
+      };
+      navigator.clipboard
+        ? navigator.clipboard.writeText(val).then(onCopied).catch(() => fallbackCopy(val, onCopied))
+        : fallbackCopy(val, onCopied);
+    });
+  });
+}
+
+document.getElementById('excel-search').addEventListener('input', e => {
+  renderExcelResults(e.target.value);
+});
+
+// ── Module 2: PDF + Image merge ────────────────────────────────────────────────
+
+let pdfFile = null;
+let imageFiles = [];
+
+makeDropZone('pdf-zone', 'pdf-input', files => handlePdfFile(files[0]));
+makeDropZone('img-zone', 'img-input', files => handleImageFiles(files));
+
+function updateMergeReadiness() {
+  const btn = document.getElementById('btn-merge');
+  const status = document.getElementById('merge-status');
+  if (!pdfFile && !imageFiles.length) {
+    btn.disabled = true;
+    status.textContent = '請上傳請款單 PDF 及至少一張佐證圖片';
+    status.className = 'merge-status';
+  } else if (!pdfFile) {
+    btn.disabled = true;
+    status.textContent = '尚未上傳請款單 PDF';
+    status.className = 'merge-status';
+  } else if (!imageFiles.length) {
+    btn.disabled = true;
+    status.textContent = '尚未上傳佐證圖片';
+    status.className = 'merge-status';
+  } else {
+    btn.disabled = false;
+    status.textContent = `已就緒：1 份請款單 ＋ ${imageFiles.length} 張佐證圖（上下合併為同一頁）`;
+    status.className = 'merge-status ok';
+  }
+}
+
+function handlePdfFile(file) {
+  if (!/\.pdf$/i.test(file.name)) {
+    setZoneError('pdf-zone', 'pdf-success-info', 'pdf-error-info', '請上傳 .pdf 格式的請款單');
+    return;
+  }
+  pdfFile = file;
+  setZoneSuccess('pdf-zone', 'pdf-icon', 'pdf-success-info', 'pdf-error-info', file.name);
+  updateMergeReadiness();
+}
+
+function handleImageFiles(fileList) {
+  const valid = Array.from(fileList).filter(f => /^image\/(jpeg|png)$/.test(f.type));
+  const rejected = fileList.length - valid.length;
+  if (!valid.length) {
+    setZoneError('img-zone', 'img-success-info', 'img-error-info', '請上傳 JPG 或 PNG 格式的圖片');
+    return;
+  }
+  valid.forEach(f => imageFiles.push({ file: f, url: URL.createObjectURL(f) }));
+  if (rejected) showToast(`已略過 ${rejected} 個不支援的檔案`);
+  renderImageGrid();
+  updateMergeReadiness();
+}
+
+function renderImageGrid() {
+  const grid = document.getElementById('img-grid');
+  const zone = document.getElementById('img-zone');
+
+  if (!imageFiles.length) {
+    zone.classList.remove('success');
+    document.getElementById('img-success-info').textContent = '';
+    document.getElementById('img-error-info').textContent = '';
+    grid.innerHTML = '';
+    updateMergeReadiness();
+    return;
+  }
+
+  zone.classList.remove('error');
+  zone.classList.add('success');
+  document.getElementById('img-icon').innerHTML = `
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>`;
+  document.getElementById('img-success-info').textContent =
+    `已選 ${imageFiles.length} 張圖片（點擊可繼續新增）`;
+  document.getElementById('img-error-info').textContent = '';
+
+  grid.innerHTML = imageFiles.map((item, i) => `
+    <div class="img-thumb">
+      <img src="${item.url}" alt="佐證圖 ${i + 1}" loading="lazy">
+      <span class="img-order">${i + 1}</span>
+      <button class="img-remove" data-idx="${i}" title="移除此圖">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>`).join('');
+
+  grid.querySelectorAll('.img-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      URL.revokeObjectURL(imageFiles[idx].url);
+      imageFiles.splice(idx, 1);
+      renderImageGrid();
+    });
+  });
+}
+
+// ── Merge & download ───────────────────────────────────────────────────────────
+// 版面邏輯：同一張 A4，上方 = 請款單 PDF 內容，下方 = 佐證圖片並排
+
+document.getElementById('btn-merge').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-merge');
+  const status = document.getElementById('merge-status');
+
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="2" x2="12" y2="6"/>
+      <line x1="12" y1="18" x2="12" y2="22"/>
+      <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+      <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+      <line x1="2" y1="12" x2="6" y2="12"/>
+      <line x1="18" y1="12" x2="22" y2="12"/>
+      <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+      <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+    </svg>
+    處理中…`;
+  status.className = 'merge-status';
+
+  try {
+    status.textContent = '正在載入請款單 PDF…';
+    const pdfBytes = await readAsArrayBuffer(pdfFile);
+
+    status.textContent = '正在解析 PDF 頁面…';
+    const srcDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    const outDoc = await PDFLib.PDFDocument.create();
+
+    const A4_W = 595.28, A4_H = 841.89;
+    const MARGIN = 24;
+    const GAP = 12;
+    const usableW = A4_W - MARGIN * 2;
+    const usableH = A4_H - MARGIN * 2;
+
+    // 上方請款單佔 58%，下方佐證圖佔 38%，中間留 GAP
+    const topRatio = 0.58;
+    const bottomRatio = 0.38;
+    const topH = usableH * topRatio;
+    const bottomH = usableH * bottomRatio;
+    const dividerY = MARGIN + bottomH + GAP;
+
+    // 嵌入來源 PDF 第一頁
+    status.textContent = '正在嵌入請款單頁面…';
+    const srcPage = srcDoc.getPages()[0];
+    const embeddedPage = await outDoc.embedPage(srcPage);
+    const pdfScale = Math.min(usableW / embeddedPage.width, topH / embeddedPage.height);
+    const pdfW = embeddedPage.width * pdfScale;
+    const pdfH = embeddedPage.height * pdfScale;
+
+    // 嵌入所有佐證圖片
+    status.textContent = '正在處理佐證圖片…';
+    const embeddedImgs = [];
+    for (let i = 0; i < imageFiles.length; i++) {
+      const { file } = imageFiles[i];
+      status.textContent = `正在嵌入第 ${i + 1} / ${imageFiles.length} 張圖片…`;
+      const imgBytes = await readAsArrayBuffer(file);
+      const img = file.type === 'image/png'
+        ? await outDoc.embedPng(imgBytes)
+        : await outDoc.embedJpg(imgBytes);
+      embeddedImgs.push(img);
+    }
+
+    // 計算圖片在下方區域的排列（等高並排，水平置中）
+    const imgGap = 10;
+    const imgCount = embeddedImgs.length;
+    const totalGap = (imgCount - 1) * imgGap;
+    const availW = usableW - totalGap;
+
+    // 先讓每張圖等高 = bottomH，算出各自寬度
+    let imgDims = embeddedImgs.map(img => {
+      const s = bottomH / img.height;
+      return { w: img.width * s, h: bottomH };
+    });
+    // 如果總寬超出可用寬度，等比例縮小
+    const totalW = imgDims.reduce((sum, d) => sum + d.w, 0);
+    if (totalW > availW) {
+      const shrink = availW / totalW;
+      imgDims = imgDims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
+    }
+
+    // 建立輸出頁面
+    status.textContent = '正在合成最終頁面…';
+    const page = outDoc.addPage([A4_W, A4_H]);
+
+    // 繪製上方：請款單（水平置中，靠上）
+    const pdfX = (A4_W - pdfW) / 2;
+    const pdfY = A4_H - MARGIN - pdfH;
+    page.drawPage(embeddedPage, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+
+    // 繪製分隔線
+    const lineY = dividerY + GAP / 2;
+    page.drawLine({
+      start: { x: MARGIN, y: lineY },
+      end: { x: A4_W - MARGIN, y: lineY },
+      thickness: 0.5,
+      color: PDFLib.rgb(0.75, 0.75, 0.75),
+    });
+
+    // 繪製下方：佐證圖片並排置中
+    const rowW = imgDims.reduce((sum, d) => sum + d.w, 0) + totalGap;
+    let curX = (A4_W - rowW) / 2;
+    const imgBaseY = MARGIN + (bottomH - imgDims[0].h) / 2;
+
+    for (let i = 0; i < embeddedImgs.length; i++) {
+      const dim = imgDims[i];
+      const imgY = MARGIN + (bottomH - dim.h) / 2;
+      page.drawImage(embeddedImgs[i], {
+        x: curX, y: imgY, width: dim.w, height: dim.h,
+      });
+      curX += dim.w + imgGap;
+    }
+
+    // 若來源 PDF 有多頁，附加剩餘頁面在後
+    if (srcDoc.getPageCount() > 1) {
+      const extraIndices = Array.from({ length: srcDoc.getPageCount() - 1 }, (_, i) => i + 1);
+      const extraPages = await outDoc.copyPages(srcDoc, extraIndices);
+      extraPages.forEach(p => outDoc.addPage(p));
+    }
+
+    status.textContent = '正在產生最終 PDF…';
+    const outBytes = await outDoc.save();
+
+    const filename = `請款資料_${today()}.pdf`;
+    const blob = new Blob([outBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+
+    status.textContent = `完成！已下載「${filename}」— 請款單＋佐證圖合併於同一頁`;
+    status.className = 'merge-status ok';
+    showToast('合併完成，已自動下載 ✓');
+
+  } catch (err) {
+    console.error(err);
+    const msg = err?.message?.includes('password')
+      ? '此 PDF 設有密碼保護，無法合併'
+      : '合併失敗，請確認 PDF 及圖片格式是否正確';
+    status.textContent = msg;
+    status.className = 'merge-status err';
+    showToast('合併失敗：' + msg);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      合併並下載`;
+    updateMergeReadiness();
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+updateMergeReadiness();
+</script>
+</body>
+</html>
