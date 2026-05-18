@@ -575,7 +575,7 @@
 <input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
 
 <div class="toast" id="toast"></div>
-<span class="version">v2.1</span>
+<span class="version">v2.2</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -1072,11 +1072,12 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
         rowData.push({ startIdx, endIdx, dims, rowCapH, rowH });
       }
 
-      // 圖片區塊在請款單下方空白區域置中
+      // 圖片區塊在請款單表格下方空白區域垂直置中
+      // PDF座標：Y=0在頁底，pdfY是嵌入PDF的底邊，表格內容約在pdfY+50結束
       const totalBlockH = rowData.reduce((s, r) => s + r.rowH, 0) + (rowCount - 1) * rowGap;
-      const spaceBottom = MARGIN;
-      const spaceCenter = spaceBottom + (pdfY - 30 - spaceBottom) / 2;
-      let curY = spaceCenter + totalBlockH / 2;
+      const areaTop = pdfY + 50;
+      const areaBottom = MARGIN;
+      let curY = areaBottom + ((areaTop - areaBottom) + totalBlockH) / 2;
 
       for (const { startIdx, endIdx, dims, rowCapH } of rowData) {
         const rowImgCount = endIdx - startIdx;
