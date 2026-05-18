@@ -1009,16 +1009,19 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
         embeddedImgs.push(img);
       }
 
-      const imgAreaTop = pdfY + 50;
-      const imgAreaH = imgAreaTop - MARGIN;
       const imgGap = 10;
       const rowGap = 10;
       const CAPTION_H = 34;
       const imgCount = embeddedImgs.length;
       const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
       const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
-      const rowSlotH = (imgAreaH - (rowCount - 1) * rowGap) / rowCount;
-      const rowImgH = rowSlotH - CAPTION_H;
+
+      // 可用空白區域：請款單底部到頁面底部邊距
+      const spaceTop = pdfY + 30;
+      const spaceH = spaceTop - MARGIN;
+
+      // 先算每排高度上限，再縮放
+      const maxRowH = (spaceH - (rowCount - 1) * rowGap - rowCount * CAPTION_H) / rowCount;
 
       status.textContent = '正在處理備註文字…';
       const captionImgs = [];
@@ -1032,6 +1035,8 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
         }
       }
 
+      // 預先計算每排的 dims
+      const rowData = [];
       for (let row = 0; row < rowCount; row++) {
         const startIdx = row * IMGS_PER_ROW;
         const endIdx = Math.min(startIdx + IMGS_PER_ROW, imgCount);
@@ -1041,8 +1046,8 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
         let dims = [];
         for (let i = startIdx; i < endIdx; i++) {
-          const s = rowImgH / embeddedImgs[i].height;
-          dims.push({ w: embeddedImgs[i].width * s, h: rowImgH });
+          const s = maxRowH / embeddedImgs[i].height;
+          dims.push({ w: embeddedImgs[i].width * s, h: maxRowH });
         }
         const totalImgW = dims.reduce((sum, d) => sum + d.w, 0);
         if (totalImgW > availRowW) {
@@ -1059,31 +1064,49 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
           }
         }
 
+        const hasAnyCap = [];
+        for (let i = startIdx; i < endIdx; i++) hasAnyCap.push(captionImgs[i] ? CAPTION_H : 0);
+        const rowCapH = Math.max(...hasAnyCap);
+        const rowH = dims[0].h + rowCapH;
+
+        rowData.push({ startIdx, endIdx, dims, rowCapH, rowH });
+      }
+
+      // 整體區塊高度，在空白區域垂直置中
+      const totalBlockH = rowData.reduce((s, r) => s + r.rowH, 0) + (rowCount - 1) * rowGap;
+      let curY = MARGIN + (spaceH - totalBlockH) / 2 + totalBlockH;
+
+      for (const { startIdx, endIdx, dims, rowCapH } of rowData) {
+        const rowImgCount = endIdx - startIdx;
+        const totalImgGap = (rowImgCount - 1) * imgGap;
         const thisRowW = dims.reduce((sum, d) => sum + d.w, 0) + totalImgGap;
         let curX = (A4_W - thisRowW) / 2;
-        const slotTopY = imgAreaTop - row * (rowSlotH + rowGap);
 
+        // curY 是這排的頂部
         for (let i = 0; i < dims.length; i++) {
           const dim = dims[i];
           const capImg = captionImgs[startIdx + i];
-          const capH = capImg ? CAPTION_H : 0;
 
-          const imgY = slotTopY - capH - dim.h;
+          // 文字在上
+          if (capImg) {
+            const capScale = Math.min(dim.w / capImg.width, (CAPTION_H - 4) / capImg.height);
+            const cw = capImg.width * capScale;
+            const ch = capImg.height * capScale;
+            const cx = curX + (dim.w - cw) / 2;
+            const cy = curY - CAPTION_H + (CAPTION_H - ch) / 2;
+            page.drawImage(capImg, { x: cx, y: cy, width: cw, height: ch });
+          }
+
+          // 圖片在下
+          const imgY = curY - rowCapH - dim.h;
           page.drawImage(embeddedImgs[startIdx + i], {
             x: curX, y: imgY, width: dim.w, height: dim.h,
           });
 
-          if (capImg) {
-            const capScale = Math.min(dim.w / capImg.width, (CAPTION_H - 2) / capImg.height);
-            const cw = capImg.width * capScale;
-            const ch = capImg.height * capScale;
-            const cx = curX + (dim.w - cw) / 2;
-            const cy = slotTopY - CAPTION_H + (CAPTION_H - ch) / 2;
-            page.drawImage(capImg, { x: cx, y: cy, width: cw, height: ch });
-          }
-
           curX += dim.w + imgGap;
         }
+
+        curY -= rowCapH + dims[0].h + rowGap;
       }
     }
 
