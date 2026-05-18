@@ -1056,6 +1056,15 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
         const shrink = availRowW / totalImgW;
         dims = dims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
       }
+      if (imgCount === 1) {
+        const maxW = usableW * 0.5;
+        const d = dims[0];
+        if (d.w > maxW) {
+          const s = maxW / d.w;
+          d.w *= s;
+          d.h *= s;
+        }
+      }
 
       const thisRowW = dims.reduce((sum, d) => sum + d.w, 0) + totalImgGap;
       let curX = (A4_W - thisRowW) / 2;
