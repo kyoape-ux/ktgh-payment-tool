@@ -912,44 +912,55 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     const PDF_IMG_GAP = 30;
     const pdfY = A4_H - MARGIN - pdfH;
     const imgAreaTop = pdfY - PDF_IMG_GAP;
-    const imgAreaH = Math.min(imgAreaTop - MARGIN, 280);
-    const imgAreaBottom = imgAreaTop - imgAreaH;
+    const imgAreaH = imgAreaTop - MARGIN;
 
     const imgGap = 10;
+    const rowGap = 10;
     const imgCount = embeddedImgs.length;
-    const totalGap = (imgCount - 1) * imgGap;
-    const availW = usableW - totalGap;
-
-    let imgDims = embeddedImgs.map(img => {
-      const s = imgAreaH / img.height;
-      return { w: img.width * s, h: imgAreaH };
-    });
-    const totalW = imgDims.reduce((sum, d) => sum + d.w, 0);
-    if (totalW > availW) {
-      const shrink = availW / totalW;
-      imgDims = imgDims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
-    }
+    const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
+    const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
+    const rowH = (imgAreaH - (rowCount - 1) * rowGap) / rowCount;
 
     // 建立輸出頁面
     status.textContent = '正在合成最終頁面…';
     const page = outDoc.addPage([A4_W, A4_H]);
 
-    // 繪製裁切後的請款單（靠上）
+    // 繪製請款單（靠上）
     page.drawPage(embeddedPage, {
       x: MARGIN, y: pdfY, width: pdfW, height: pdfH,
     });
 
-    // 繪製佐證圖片（緊接在請款單下方，無分隔線）
-    const rowW = imgDims.reduce((sum, d) => sum + d.w, 0) + totalGap;
-    let curX = (A4_W - rowW) / 2;
+    // 繪製佐證圖片（≤2 張一排；≥3 張每排 2 張，上下排列）
+    for (let row = 0; row < rowCount; row++) {
+      const startIdx = row * IMGS_PER_ROW;
+      const endIdx = Math.min(startIdx + IMGS_PER_ROW, imgCount);
+      const rowImgCount = endIdx - startIdx;
+      const totalImgGap = (rowImgCount - 1) * imgGap;
+      const availRowW = usableW - totalImgGap;
 
-    for (let i = 0; i < embeddedImgs.length; i++) {
-      const dim = imgDims[i];
-      const imgY = imgAreaBottom + (imgAreaH - dim.h) / 2;
-      page.drawImage(embeddedImgs[i], {
-        x: curX, y: imgY, width: dim.w, height: dim.h,
-      });
-      curX += dim.w + imgGap;
+      let dims = [];
+      for (let i = startIdx; i < endIdx; i++) {
+        const s = rowH / embeddedImgs[i].height;
+        dims.push({ w: embeddedImgs[i].width * s, h: rowH });
+      }
+      const totalImgW = dims.reduce((sum, d) => sum + d.w, 0);
+      if (totalImgW > availRowW) {
+        const shrink = availRowW / totalImgW;
+        dims = dims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
+      }
+
+      const thisRowW = dims.reduce((sum, d) => sum + d.w, 0) + totalImgGap;
+      let curX = (A4_W - thisRowW) / 2;
+      const slotTopY = imgAreaTop - row * (rowH + rowGap);
+
+      for (let i = 0; i < dims.length; i++) {
+        const dim = dims[i];
+        const imgY = slotTopY - rowH + (rowH - dim.h) / 2;
+        page.drawImage(embeddedImgs[startIdx + i], {
+          x: curX, y: imgY, width: dim.w, height: dim.h,
+        });
+        curX += dim.w + imgGap;
+      }
     }
 
     // 若來源 PDF 有多頁，附加剩餘頁面在後
