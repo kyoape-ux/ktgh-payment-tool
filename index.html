@@ -852,7 +852,7 @@ function renderImageGrid() {
 }
 
 // ── Merge & download ───────────────────────────────────────────────────────────
-// 版面邏輯：同一張 A4，上方 = 請款單 PDF 內容，下方 = 佐證圖片並排
+// 版面邏輯：同一張 A4，全頁嵌入請款單 PDF，佐證圖片疊在下方空白區（無分隔線）
 
 document.getElementById('btn-merge').addEventListener('click', async () => {
   const btn = document.getElementById('btn-merge');
@@ -884,23 +884,14 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
     const A4_W = 595.28, A4_H = 841.89;
     const MARGIN = 24;
-    const GAP = 12;
     const usableW = A4_W - MARGIN * 2;
-    const usableH = A4_H - MARGIN * 2;
 
-    // 上方請款單佔 58%，下方佐證圖佔 38%，中間留 GAP
-    const topRatio = 0.58;
-    const bottomRatio = 0.38;
-    const topH = usableH * topRatio;
-    const bottomH = usableH * bottomRatio;
-    const dividerY = MARGIN + bottomH + GAP;
-
-    // 嵌入來源 PDF 第一頁
+    // 嵌入來源 PDF 第一頁（全頁）
     status.textContent = '正在嵌入請款單頁面…';
     const srcPage = srcDoc.getPages()[0];
     const embeddedPage = await outDoc.embedPage(srcPage);
-    const pdfScale = Math.min(usableW / embeddedPage.width, topH / embeddedPage.height);
-    const pdfW = embeddedPage.width * pdfScale;
+    const pdfScale = usableW / embeddedPage.width;
+    const pdfW = usableW;
     const pdfH = embeddedPage.height * pdfScale;
 
     // 嵌入所有佐證圖片
@@ -916,18 +907,18 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
       embeddedImgs.push(img);
     }
 
-    // 計算圖片在下方區域的排列（等高並排，水平置中）
+    // 圖片區域：頁面底部 30%，距離請款單內容約 200pt
+    const IMG_AREA_TOP = A4_H * 0.33;
+    const imgAreaH = IMG_AREA_TOP - MARGIN;
     const imgGap = 10;
     const imgCount = embeddedImgs.length;
     const totalGap = (imgCount - 1) * imgGap;
     const availW = usableW - totalGap;
 
-    // 先讓每張圖等高 = bottomH，算出各自寬度
     let imgDims = embeddedImgs.map(img => {
-      const s = bottomH / img.height;
-      return { w: img.width * s, h: bottomH };
+      const s = imgAreaH / img.height;
+      return { w: img.width * s, h: imgAreaH };
     });
-    // 如果總寬超出可用寬度，等比例縮小
     const totalW = imgDims.reduce((sum, d) => sum + d.w, 0);
     if (totalW > availW) {
       const shrink = availW / totalW;
@@ -938,28 +929,21 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     status.textContent = '正在合成最終頁面…';
     const page = outDoc.addPage([A4_W, A4_H]);
 
-    // 繪製上方：請款單（水平置中，靠上）
-    const pdfX = (A4_W - pdfW) / 2;
-    const pdfY = A4_H - MARGIN - pdfH;
-    page.drawPage(embeddedPage, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
-
-    // 繪製分隔線
-    const lineY = dividerY + GAP / 2;
-    page.drawLine({
-      start: { x: MARGIN, y: lineY },
-      end: { x: A4_W - MARGIN, y: lineY },
-      thickness: 0.5,
-      color: PDFLib.rgb(0.75, 0.75, 0.75),
+    // 繪製請款單 PDF（全頁，從頂部開始）
+    page.drawPage(embeddedPage, {
+      x: MARGIN,
+      y: A4_H - MARGIN - pdfH,
+      width: pdfW,
+      height: pdfH,
     });
 
-    // 繪製下方：佐證圖片並排置中
+    // 繪製佐證圖片（疊在 PDF 下方空白區，無分隔線）
     const rowW = imgDims.reduce((sum, d) => sum + d.w, 0) + totalGap;
     let curX = (A4_W - rowW) / 2;
-    const imgBaseY = MARGIN + (bottomH - imgDims[0].h) / 2;
 
     for (let i = 0; i < embeddedImgs.length; i++) {
       const dim = imgDims[i];
-      const imgY = MARGIN + (bottomH - dim.h) / 2;
+      const imgY = MARGIN + (imgAreaH - dim.h) / 2;
       page.drawImage(embeddedImgs[i], {
         x: curX, y: imgY, width: dim.w, height: dim.h,
       });
