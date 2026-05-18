@@ -359,6 +359,69 @@
     }
 
     .icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+
+    /* ── Preview overlay ── */
+    .preview-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .preview-overlay.open { opacity: 1; pointer-events: all; }
+
+    .preview-bar {
+      background: #1A2820;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .preview-title { font-size: 14px; font-weight: 600; flex: 1; }
+
+    .btn-preview-action {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+      border: none;
+    }
+    .btn-print {
+      background: var(--ci-blue);
+      color: white;
+    }
+    .btn-print:hover { background: #0090a8; }
+
+    .btn-dl {
+      background: var(--brand);
+      color: white;
+    }
+    .btn-dl:hover { background: var(--brand-light); }
+
+    .btn-close-preview {
+      background: transparent;
+      color: #ccc;
+      border: 1px solid #555;
+    }
+    .btn-close-preview:hover { background: #333; color: white; }
+
+    .preview-iframe {
+      flex: 1;
+      border: none;
+      background: #525659;
+    }
   </style>
 </head>
 <body>
@@ -512,11 +575,11 @@
     <div class="merge-actions">
       <button class="btn-primary" id="btn-merge" disabled>
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
-        合併並下載
+        預覽合併結果
       </button>
       <div class="merge-status" id="merge-status">請上傳請款單 PDF 及至少一張佐證圖片</div>
     </div>
@@ -530,8 +593,39 @@
 <input type="file" id="pdf-input" accept=".pdf" style="display:none">
 <input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
 
+<!-- ─── Preview overlay ─── -->
+<div class="preview-overlay" id="preview-overlay">
+  <div class="preview-bar">
+    <span class="preview-title">預覽合併結果</span>
+    <button class="btn-preview-action btn-print" id="btn-print">
+      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      列印
+    </button>
+    <button class="btn-preview-action btn-dl" id="btn-download">
+      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      下載 PDF
+    </button>
+    <button class="btn-preview-action btn-close-preview" id="btn-preview-close">
+      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+      關閉
+    </button>
+  </div>
+  <iframe class="preview-iframe" id="preview-iframe"></iframe>
+</div>
+
 <div class="toast" id="toast"></div>
-<span class="version">v1.1</span>
+<span class="version">v1.2</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -1049,18 +1143,17 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
     const filename = `請款資料_${today()}.pdf`;
     const blob = new Blob([outBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 8000);
 
-    status.textContent = `完成！已下載「${filename}」— 請款單＋佐證圖合併於同一頁`;
+    if (lastPreviewUrl) URL.revokeObjectURL(lastPreviewUrl);
+    lastPreviewUrl = URL.createObjectURL(blob);
+    lastFilename = filename;
+
+    document.getElementById('preview-iframe').src = lastPreviewUrl;
+    document.getElementById('preview-overlay').classList.add('open');
+
+    status.textContent = `合併完成 — 請確認預覽後列印或下載`;
     status.className = 'merge-status ok';
-    showToast('合併完成，已自動下載 ✓');
+    showToast('合併完成，請確認預覽');
 
   } catch (err) {
     console.error(err);
@@ -1075,12 +1168,49 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     btn.innerHTML = `
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
-      合併並下載`;
+      預覽合併結果`;
     updateMergeReadiness();
+  }
+});
+
+// ── Preview: print / download / close ──────────────────────────────────────────
+
+let lastPreviewUrl = null;
+let lastFilename = '';
+
+function closePreview() {
+  document.getElementById('preview-overlay').classList.remove('open');
+  document.getElementById('preview-iframe').src = '';
+}
+
+document.getElementById('btn-print').addEventListener('click', () => {
+  const iframe = document.getElementById('preview-iframe');
+  if (iframe.contentWindow) {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }
+});
+
+document.getElementById('btn-download').addEventListener('click', () => {
+  if (!lastPreviewUrl) return;
+  const a = document.createElement('a');
+  a.href = lastPreviewUrl;
+  a.download = lastFilename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast(`已下載「${lastFilename}」`);
+});
+
+document.getElementById('btn-preview-close').addEventListener('click', closePreview);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('preview-overlay').classList.contains('open')) {
+    closePreview();
   }
 });
 
