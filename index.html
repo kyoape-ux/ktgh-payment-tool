@@ -880,17 +880,18 @@ function renderImageGrid() {
 // ── 中文文字 → PNG（供 pdf-lib 嵌入）─────────────────────────────────────────
 
 function renderTextPng(text, fontSize) {
+  const DPR = 3;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const font = `${fontSize}px "Noto Sans TC", sans-serif`;
+  const font = `500 ${fontSize * DPR}px "Noto Sans TC", sans-serif`;
   ctx.font = font;
   const m = ctx.measureText(text);
-  canvas.width = Math.ceil(m.width) + 6;
-  canvas.height = Math.ceil(fontSize * 1.45);
+  canvas.width = Math.ceil(m.width) + 6 * DPR;
+  canvas.height = Math.ceil(fontSize * DPR * 1.5);
   ctx.font = font;
-  ctx.fillStyle = '#333333';
+  ctx.fillStyle = '#222222';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 3, canvas.height / 2);
+  ctx.fillText(text, 3 * DPR, canvas.height / 2);
   return new Promise(resolve => {
     canvas.toBlob(blob => {
       blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf)));
@@ -933,13 +934,13 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     const MARGIN = 24;
     const usableW = A4_W - MARGIN * 2;
 
-    // 嵌入請款單 PDF 第一頁（全頁，此 PDF 為 595x420pt 非 A4 全高）
+    // 嵌入請款單 PDF 第一頁（保留原始寬度，維持表格置中視覺）
     status.textContent = '正在嵌入請款單頁面…';
     const srcPage = srcDoc.getPages()[0];
     const embeddedPage = await outDoc.embedPage(srcPage);
 
-    const pdfScale = usableW / embeddedPage.width;
-    const pdfW = usableW;
+    const pdfScale = A4_W / embeddedPage.width;
+    const pdfW = A4_W;
     const pdfH = embeddedPage.height * pdfScale;
 
     // 嵌入所有佐證圖片
@@ -957,13 +958,13 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
     // 版面計算：PDF 靠上 → 間距 30pt → 圖片緊接其下
     const PDF_IMG_GAP = 30;
-    const pdfY = A4_H - MARGIN - pdfH;
+    const pdfY = A4_H - pdfH;
     const imgAreaTop = pdfY - PDF_IMG_GAP;
     const imgAreaH = imgAreaTop - MARGIN;
 
     const imgGap = 10;
     const rowGap = 10;
-    const CAPTION_H = 16;
+    const CAPTION_H = 24;
     const imgCount = embeddedImgs.length;
     const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
     const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
@@ -987,9 +988,9 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     status.textContent = '正在合成最終頁面…';
     const page = outDoc.addPage([A4_W, A4_H]);
 
-    // 繪製請款單（靠上）
+    // 繪製請款單（全寬置中，保留原始邊距）
     page.drawPage(embeddedPage, {
-      x: MARGIN, y: pdfY, width: pdfW, height: pdfH,
+      x: 0, y: pdfY, width: pdfW, height: pdfH,
     });
 
     // 繪製佐證圖片＋備註（≤2 張一排；≥3 張每排 2 張，上下排列）
