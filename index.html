@@ -575,7 +575,7 @@
 <input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
 
 <div class="toast" id="toast"></div>
-<span class="version">v1.9</span>
+<span class="version">v2.0</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -1055,7 +1055,7 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
           dims = dims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
         }
         if (imgCount === 1) {
-          const maxW = usableW * 0.65;
+          const maxW = usableW * 0.80;
           const d = dims[0];
           if (d.w > maxW) {
             const s = maxW / d.w;
@@ -1072,9 +1072,9 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
         rowData.push({ startIdx, endIdx, dims, rowCapH, rowH });
       }
 
-      // 整體區塊高度，在空白區域垂直置中
+      // 圖片區塊從請款單底部往下固定 160pt 開始
       const totalBlockH = rowData.reduce((s, r) => s + r.rowH, 0) + (rowCount - 1) * rowGap;
-      let curY = MARGIN + (spaceH - totalBlockH) / 2 + totalBlockH;
+      let curY = pdfY - 160 + totalBlockH;
 
       for (const { startIdx, endIdx, dims, rowCapH } of rowData) {
         const rowImgCount = endIdx - startIdx;
