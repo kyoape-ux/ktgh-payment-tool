@@ -12,17 +12,17 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --brand:       #006341;
-      --brand-light: #007D53;
-      --brand-bg:    #EAF5EE;
-      --brand-bd:    #B3D9C5;
-      --ci-green:    #6EC300;
-      --ci-blue:     #00AAC8;
-      --bg:          #F3F9F6;
-      --border:      #DDE8E3;
-      --text:        #1A2820;
-      --text-sub:    #5A7A6A;
-      --text-muted:  #90A89E;
+      --brand:       #5046E5;
+      --brand-light: #635BF0;
+      --brand-bg:    #EEEEFF;
+      --brand-bd:    #C7C4F5;
+      --ci-green:    #7C5CFC;
+      --ci-blue:     #5046E5;
+      --bg:          #F5F4FB;
+      --border:      #E2E0EC;
+      --text:        #1A1A2E;
+      --text-sub:    #5A5A7A;
+      --text-muted:  #9090A8;
     }
 
     body {
@@ -102,7 +102,7 @@
     .upload-zone.success {
       border-style: solid;
       border-color: var(--ci-green);
-      background: #F0FAE8;
+      background: #F0EDFF;
     }
     .upload-zone.error {
       border-style: solid;
@@ -114,7 +114,7 @@
     .upload-zone.error .upload-icon { color: #dc2626; }
     .upload-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
     .upload-hint { font-size: 13px; color: var(--text-muted); }
-    .upload-success-info { font-size: 13px; font-weight: 500; color: #16a34a; margin-top: 8px; min-height: 18px; }
+    .upload-success-info { font-size: 13px; font-weight: 500; color: #5046E5; margin-top: 8px; min-height: 18px; }
     .upload-error-info { font-size: 13px; color: #dc2626; margin-top: 8px; min-height: 18px; }
 
     /* ── Section title ── */
@@ -309,7 +309,7 @@
       flex-wrap: wrap;
     }
     .merge-status { font-size: 13px; color: var(--text-sub); }
-    .merge-status.ok { color: #16a34a; }
+    .merge-status.ok { color: #5046E5; }
     .merge-status.err { color: #dc2626; }
 
     /* ── Buttons ── */
@@ -338,7 +338,7 @@
       bottom: 32px;
       left: 50%;
       transform: translateX(-50%) translateY(80px);
-      background: #1A2820;
+      background: #1A1A2E;
       color: white;
       padding: 12px 24px;
       border-radius: 10px;
@@ -375,7 +375,7 @@
     .preview-overlay.open { opacity: 1; pointer-events: all; }
 
     .preview-bar {
-      background: #1A2820;
+      background: #1A1A2E;
       color: white;
       padding: 12px 24px;
       display: flex;
@@ -625,7 +625,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<span class="version">v1.2</span>
+<span class="version">v1.3</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -1051,9 +1051,9 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     }
 
     // 版面計算：PDF 靠上 → 間距 30pt → 圖片緊接其下
-    const PDF_IMG_GAP = 30;
+    // 圖片往上移：PDF 底部有大片空白，直接讓圖片疊入空白區
     const pdfY = A4_H - pdfH;
-    const imgAreaTop = pdfY - PDF_IMG_GAP;
+    const imgAreaTop = pdfY + 50;
     const imgAreaH = imgAreaTop - MARGIN;
 
     const imgGap = 10;
