@@ -821,18 +821,14 @@ makeDropZone('img-zone', 'img-input', files => handleImageFiles(files));
 function updateMergeReadiness() {
   const btn = document.getElementById('btn-merge');
   const status = document.getElementById('merge-status');
-  if (!pdfFile && !imageFiles.length) {
+  if (!pdfFile) {
     btn.disabled = true;
-    status.textContent = '請上傳請款單 PDF 及至少一張佐證圖片';
-    status.className = 'merge-status';
-  } else if (!pdfFile) {
-    btn.disabled = true;
-    status.textContent = '尚未上傳請款單 PDF';
+    status.textContent = '請上傳請款單 PDF';
     status.className = 'merge-status';
   } else if (!imageFiles.length) {
-    btn.disabled = true;
-    status.textContent = '尚未上傳佐證圖片';
-    status.className = 'merge-status';
+    btn.disabled = false;
+    status.textContent = `已就緒：1 份請款單（可直接預覽，或加入佐證圖片合併）`;
+    status.className = 'merge-status ok';
   } else {
     btn.disabled = false;
     status.textContent = `已就緒：1 份請款單 ＋ ${imageFiles.length} 張佐證圖（上下合併為同一頁）`;
@@ -987,110 +983,107 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     const pdfW = A4_W;
     const pdfH = embeddedPage.height * pdfScale;
 
-    // 嵌入所有佐證圖片
-    status.textContent = '正在處理佐證圖片…';
-    const embeddedImgs = [];
-    for (let i = 0; i < imageFiles.length; i++) {
-      const { file } = imageFiles[i];
-      status.textContent = `正在嵌入第 ${i + 1} / ${imageFiles.length} 張圖片…`;
-      const imgBytes = await readAsArrayBuffer(file);
-      const img = file.type === 'image/png'
-        ? await outDoc.embedPng(imgBytes)
-        : await outDoc.embedJpg(imgBytes);
-      embeddedImgs.push(img);
-    }
-
-    // 版面計算：PDF 靠上 → 間距 30pt → 圖片緊接其下
-    // 圖片往上移：PDF 底部有大片空白，直接讓圖片疊入空白區
     const pdfY = A4_H - pdfH;
-    const imgAreaTop = pdfY + 50;
-    const imgAreaH = imgAreaTop - MARGIN;
-
-    const imgGap = 10;
-    const rowGap = 10;
-    const CAPTION_H = 34;
-    const imgCount = embeddedImgs.length;
-    const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
-    const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
-    const rowSlotH = (imgAreaH - (rowCount - 1) * rowGap) / rowCount;
-    const rowImgH = rowSlotH - CAPTION_H;
-
-    // 預先渲染備註文字為 PNG
-    status.textContent = '正在處理備註文字…';
-    const captionImgs = [];
-    for (let i = 0; i < imgCount; i++) {
-      const cap = imageFiles[i].caption.trim();
-      if (cap) {
-        const pngBytes = await renderTextPng(cap, 11);
-        captionImgs.push(await outDoc.embedPng(pngBytes));
-      } else {
-        captionImgs.push(null);
-      }
-    }
 
     // 建立輸出頁面
     status.textContent = '正在合成最終頁面…';
     const page = outDoc.addPage([A4_W, A4_H]);
 
-    // 繪製請款單（右移 50pt 補償原始 PDF 偏左）
+    // 繪製請款單（右移補償原始 PDF 偏左）
     const PDF_OFFSET_X = 20;
     page.drawPage(embeddedPage, {
       x: PDF_OFFSET_X, y: pdfY, width: pdfW, height: pdfH,
     });
 
-    // 繪製佐證圖片＋備註（≤2 張一排；≥3 張每排 2 張，上下排列）
-    for (let row = 0; row < rowCount; row++) {
-      const startIdx = row * IMGS_PER_ROW;
-      const endIdx = Math.min(startIdx + IMGS_PER_ROW, imgCount);
-      const rowImgCount = endIdx - startIdx;
-      const totalImgGap = (rowImgCount - 1) * imgGap;
-      const availRowW = usableW - totalImgGap;
+    // 有佐證圖片時才處理圖片區塊
+    if (imageFiles.length) {
+      status.textContent = '正在處理佐證圖片…';
+      const embeddedImgs = [];
+      for (let i = 0; i < imageFiles.length; i++) {
+        const { file } = imageFiles[i];
+        status.textContent = `正在嵌入第 ${i + 1} / ${imageFiles.length} 張圖片…`;
+        const imgBytes = await readAsArrayBuffer(file);
+        const img = file.type === 'image/png'
+          ? await outDoc.embedPng(imgBytes)
+          : await outDoc.embedJpg(imgBytes);
+        embeddedImgs.push(img);
+      }
 
-      let dims = [];
-      for (let i = startIdx; i < endIdx; i++) {
-        const s = rowImgH / embeddedImgs[i].height;
-        dims.push({ w: embeddedImgs[i].width * s, h: rowImgH });
-      }
-      const totalImgW = dims.reduce((sum, d) => sum + d.w, 0);
-      if (totalImgW > availRowW) {
-        const shrink = availRowW / totalImgW;
-        dims = dims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
-      }
-      if (imgCount === 1) {
-        const maxW = usableW * 0.5;
-        const d = dims[0];
-        if (d.w > maxW) {
-          const s = maxW / d.w;
-          d.w *= s;
-          d.h *= s;
+      const imgAreaTop = pdfY + 50;
+      const imgAreaH = imgAreaTop - MARGIN;
+      const imgGap = 10;
+      const rowGap = 10;
+      const CAPTION_H = 34;
+      const imgCount = embeddedImgs.length;
+      const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
+      const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
+      const rowSlotH = (imgAreaH - (rowCount - 1) * rowGap) / rowCount;
+      const rowImgH = rowSlotH - CAPTION_H;
+
+      status.textContent = '正在處理備註文字…';
+      const captionImgs = [];
+      for (let i = 0; i < imgCount; i++) {
+        const cap = imageFiles[i].caption.trim();
+        if (cap) {
+          const pngBytes = await renderTextPng(cap, 11);
+          captionImgs.push(await outDoc.embedPng(pngBytes));
+        } else {
+          captionImgs.push(null);
         }
       }
 
-      const thisRowW = dims.reduce((sum, d) => sum + d.w, 0) + totalImgGap;
-      let curX = (A4_W - thisRowW) / 2;
-      const slotTopY = imgAreaTop - row * (rowSlotH + rowGap);
+      for (let row = 0; row < rowCount; row++) {
+        const startIdx = row * IMGS_PER_ROW;
+        const endIdx = Math.min(startIdx + IMGS_PER_ROW, imgCount);
+        const rowImgCount = endIdx - startIdx;
+        const totalImgGap = (rowImgCount - 1) * imgGap;
+        const availRowW = usableW - totalImgGap;
 
-      for (let i = 0; i < dims.length; i++) {
-        const dim = dims[i];
-        const capImg = captionImgs[startIdx + i];
-        const capH = capImg ? CAPTION_H : 0;
-
-        // 備註文字在上，圖片在下
-        const imgY = slotTopY - capH - dim.h;
-        page.drawImage(embeddedImgs[startIdx + i], {
-          x: curX, y: imgY, width: dim.w, height: dim.h,
-        });
-
-        if (capImg) {
-          const capScale = Math.min(dim.w / capImg.width, (CAPTION_H - 2) / capImg.height);
-          const cw = capImg.width * capScale;
-          const ch = capImg.height * capScale;
-          const cx = curX + (dim.w - cw) / 2;
-          const cy = slotTopY - CAPTION_H + (CAPTION_H - ch) / 2;
-          page.drawImage(capImg, { x: cx, y: cy, width: cw, height: ch });
+        let dims = [];
+        for (let i = startIdx; i < endIdx; i++) {
+          const s = rowImgH / embeddedImgs[i].height;
+          dims.push({ w: embeddedImgs[i].width * s, h: rowImgH });
+        }
+        const totalImgW = dims.reduce((sum, d) => sum + d.w, 0);
+        if (totalImgW > availRowW) {
+          const shrink = availRowW / totalImgW;
+          dims = dims.map(d => ({ w: d.w * shrink, h: d.h * shrink }));
+        }
+        if (imgCount === 1) {
+          const maxW = usableW * 0.65;
+          const d = dims[0];
+          if (d.w > maxW) {
+            const s = maxW / d.w;
+            d.w *= s;
+            d.h *= s;
+          }
         }
 
-        curX += dim.w + imgGap;
+        const thisRowW = dims.reduce((sum, d) => sum + d.w, 0) + totalImgGap;
+        let curX = (A4_W - thisRowW) / 2;
+        const slotTopY = imgAreaTop - row * (rowSlotH + rowGap);
+
+        for (let i = 0; i < dims.length; i++) {
+          const dim = dims[i];
+          const capImg = captionImgs[startIdx + i];
+          const capH = capImg ? CAPTION_H : 0;
+
+          const imgY = slotTopY - capH - dim.h;
+          page.drawImage(embeddedImgs[startIdx + i], {
+            x: curX, y: imgY, width: dim.w, height: dim.h,
+          });
+
+          if (capImg) {
+            const capScale = Math.min(dim.w / capImg.width, (CAPTION_H - 2) / capImg.height);
+            const cw = capImg.width * capScale;
+            const ch = capImg.height * capScale;
+            const cx = curX + (dim.w - cw) / 2;
+            const cy = slotTopY - CAPTION_H + (CAPTION_H - ch) / 2;
+            page.drawImage(capImg, { x: cx, y: cy, width: cw, height: ch });
+          }
+
+          curX += dim.w + imgGap;
+        }
       }
     }
 
@@ -1114,7 +1107,9 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     window.open(lastPreviewUrl, '_blank');
     document.getElementById('post-merge').classList.add('show');
 
-    status.textContent = `合併完成 — 已在新視窗開啟預覽`;
+    status.textContent = imageFiles.length
+      ? `合併完成 — 已在新視窗開啟預覽`
+      : `已在新視窗開啟請款單預覽`;
     status.className = 'merge-status ok';
     showToast('合併完成，已開啟預覽視窗');
 
