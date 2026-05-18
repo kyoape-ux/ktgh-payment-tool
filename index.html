@@ -402,14 +402,7 @@
 
 <!-- ─── Tab bar ─── -->
 <nav class="tab-bar">
-  <button class="tab-btn active" data-tab="tab-search">
-    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="11" cy="11" r="8"/>
-      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-    業務支援單搜尋
-  </button>
-  <button class="tab-btn" data-tab="tab-merge">
+  <button class="tab-btn active" data-tab="tab-merge">
     <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
       <polyline points="7 10 12 15 17 10"/>
@@ -417,13 +410,20 @@
     </svg>
     請款單＋佐證圖合併
   </button>
+  <button class="tab-btn" data-tab="tab-search">
+    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    業務支援單搜尋
+  </button>
 </nav>
 
 <!-- ─── Main ─── -->
 <main class="main">
 
-  <!-- ════ Tab 1：業務支援單搜尋 ════ -->
-  <div class="tab-content active" id="tab-search">
+  <!-- ════ Tab 2：業務支援單搜尋 ════ -->
+  <div class="tab-content" id="tab-search">
 
     <div class="section-title">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -474,8 +474,8 @@
 
   </div>
 
-  <!-- ════ Tab 2：請款單＋佐證圖合併 ════ -->
-  <div class="tab-content" id="tab-merge">
+  <!-- ════ Tab 1：請款單＋佐證圖合併 ════ -->
+  <div class="tab-content active" id="tab-merge">
 
     <div class="merge-grid">
 
@@ -1007,7 +1007,7 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
     const imgGap = 10;
     const rowGap = 10;
-    const CAPTION_H = 24;
+    const CAPTION_H = 34;
     const imgCount = embeddedImgs.length;
     const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
     const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
