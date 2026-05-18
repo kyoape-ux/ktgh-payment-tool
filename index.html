@@ -574,7 +574,7 @@
 <input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
 
 <div class="toast" id="toast"></div>
-<span class="version">v1.4</span>
+<span class="version">v1.5</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -1031,9 +1031,10 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     status.textContent = '正在合成最終頁面…';
     const page = outDoc.addPage([A4_W, A4_H]);
 
-    // 繪製請款單（全寬置中，保留原始邊距）
+    // 繪製請款單（右移 50pt 補償原始 PDF 偏左）
+    const PDF_OFFSET_X = 50;
     page.drawPage(embeddedPage, {
-      x: 0, y: pdfY, width: pdfW, height: pdfH,
+      x: PDF_OFFSET_X, y: pdfY, width: pdfW, height: pdfH,
     });
 
     // 繪製佐證圖片＋備註（≤2 張一排；≥3 張每排 2 張，上下排列）
@@ -1061,18 +1062,21 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
       for (let i = 0; i < dims.length; i++) {
         const dim = dims[i];
-        const imgY = slotTopY - dim.h;
+        const capImg = captionImgs[startIdx + i];
+        const capH = capImg ? CAPTION_H : 0;
+
+        // 備註文字在上，圖片在下
+        const imgY = slotTopY - capH - dim.h;
         page.drawImage(embeddedImgs[startIdx + i], {
           x: curX, y: imgY, width: dim.w, height: dim.h,
         });
 
-        const capImg = captionImgs[startIdx + i];
         if (capImg) {
           const capScale = Math.min(dim.w / capImg.width, (CAPTION_H - 2) / capImg.height);
           const cw = capImg.width * capScale;
           const ch = capImg.height * capScale;
           const cx = curX + (dim.w - cw) / 2;
-          const cy = imgY - CAPTION_H + (CAPTION_H - ch) / 2;
+          const cy = slotTopY - CAPTION_H + (CAPTION_H - ch) / 2;
           page.drawImage(capImg, { x: cx, y: cy, width: cw, height: ch });
         }
 
