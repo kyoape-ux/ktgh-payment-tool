@@ -12,17 +12,18 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --brand:       #5046E5;
-      --brand-light: #635BF0;
-      --brand-bg:    #EEEEFF;
-      --brand-bd:    #C7C4F5;
-      --ci-green:    #7C5CFC;
-      --ci-blue:     #5046E5;
-      --bg:          #F5F4FB;
-      --border:      #E2E0EC;
-      --text:        #1A1A2E;
-      --text-sub:    #5A5A7A;
-      --text-muted:  #9090A8;
+      --brand:       #1E1B4B;
+      --brand-light: #312E81;
+      --brand-bg:    #EEF0FF;
+      --brand-bd:    #C7C2F0;
+      --ci-green:    #7C3AED;
+      --ci-blue:     #2563EB;
+      --bg:          #F0F1F8;
+      --border:      #DDDCE8;
+      --text:        #0F0D2E;
+      --text-sub:    #4A4870;
+      --text-muted:  #8886A8;
+      --grad:        linear-gradient(135deg, #0F172A 0%, #1E1B4B 40%, #4C1D95 100%);
     }
 
     body {
@@ -34,7 +35,7 @@
 
     /* ── Header ── */
     .app-header {
-      background: var(--brand);
+      background: var(--grad);
       color: white;
       padding: 0 32px;
       height: 60px;
@@ -44,7 +45,7 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 12px rgba(15,23,42,0.3);
     }
     .app-header h1 { font-size: 16px; font-weight: 600; }
     .header-sub { font-size: 12px; opacity: 0.65; margin-left: 2px; }
@@ -114,7 +115,7 @@
     .upload-zone.error .upload-icon { color: #dc2626; }
     .upload-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
     .upload-hint { font-size: 13px; color: var(--text-muted); }
-    .upload-success-info { font-size: 13px; font-weight: 500; color: #5046E5; margin-top: 8px; min-height: 18px; }
+    .upload-success-info { font-size: 13px; font-weight: 500; color: #4C1D95; margin-top: 8px; min-height: 18px; }
     .upload-error-info { font-size: 13px; color: #dc2626; margin-top: 8px; min-height: 18px; }
 
     /* ── Section title ── */
@@ -309,7 +310,7 @@
       flex-wrap: wrap;
     }
     .merge-status { font-size: 13px; color: var(--text-sub); }
-    .merge-status.ok { color: #5046E5; }
+    .merge-status.ok { color: #4C1D95; }
     .merge-status.err { color: #dc2626; }
 
     /* ── Buttons ── */
@@ -338,7 +339,7 @@
       bottom: 32px;
       left: 50%;
       transform: translateX(-50%) translateY(80px);
-      background: #1A1A2E;
+      background: #1E1B4B;
       color: white;
       padding: 12px 24px;
       border-radius: 10px;
@@ -574,7 +575,7 @@
 <input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
 
 <div class="toast" id="toast"></div>
-<span class="version">v1.5</span>
+<span class="version">v1.7</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
