@@ -285,6 +285,22 @@
     }
     .img-remove:hover { background: #dc2626; }
 
+    .img-card { display: flex; flex-direction: column; gap: 4px; }
+    .img-caption {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+      background: white;
+    }
+    .img-caption::placeholder { color: var(--text-muted); }
+    .img-caption:focus { border-color: var(--brand); }
+
     /* ── Merge actions ── */
     .merge-actions {
       display: flex;
@@ -515,7 +531,7 @@
 <input type="file" id="img-input" accept="image/jpeg,image/png" multiple style="display:none">
 
 <div class="toast" id="toast"></div>
-<span class="version">v1.0</span>
+<span class="version">v1.1</span>
 
 <script>
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -797,7 +813,7 @@ function handleImageFiles(fileList) {
     setZoneError('img-zone', 'img-success-info', 'img-error-info', '請上傳 JPG 或 PNG 格式的圖片');
     return;
   }
-  valid.forEach(f => imageFiles.push({ file: f, url: URL.createObjectURL(f) }));
+  valid.forEach(f => imageFiles.push({ file: f, url: URL.createObjectURL(f), caption: '' }));
   if (rejected) showToast(`已略過 ${rejected} 個不支援的檔案`);
   renderImageGrid();
   updateMergeReadiness();
@@ -829,15 +845,20 @@ function renderImageGrid() {
   document.getElementById('img-error-info').textContent = '';
 
   grid.innerHTML = imageFiles.map((item, i) => `
-    <div class="img-thumb">
-      <img src="${item.url}" alt="佐證圖 ${i + 1}" loading="lazy">
-      <span class="img-order">${i + 1}</span>
-      <button class="img-remove" data-idx="${i}" title="移除此圖">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+    <div class="img-card">
+      <div class="img-thumb">
+        <img src="${item.url}" alt="佐證圖 ${i + 1}" loading="lazy">
+        <span class="img-order">${i + 1}</span>
+        <button class="img-remove" data-idx="${i}" title="移除此圖">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <input class="img-caption" data-idx="${i}" type="text"
+             placeholder="備註：印製物名稱…"
+             value="${esc(item.caption)}">
     </div>`).join('');
 
   grid.querySelectorAll('.img-remove').forEach(btn => {
@@ -848,6 +869,32 @@ function renderImageGrid() {
       imageFiles.splice(idx, 1);
       renderImageGrid();
     });
+  });
+  grid.querySelectorAll('.img-caption').forEach(input => {
+    input.addEventListener('input', e => {
+      imageFiles[parseInt(e.target.dataset.idx)].caption = e.target.value;
+    });
+  });
+}
+
+// ── 中文文字 → PNG（供 pdf-lib 嵌入）─────────────────────────────────────────
+
+function renderTextPng(text, fontSize) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const font = `${fontSize}px "Noto Sans TC", sans-serif`;
+  ctx.font = font;
+  const m = ctx.measureText(text);
+  canvas.width = Math.ceil(m.width) + 6;
+  canvas.height = Math.ceil(fontSize * 1.45);
+  ctx.font = font;
+  ctx.fillStyle = '#333333';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 3, canvas.height / 2);
+  return new Promise(resolve => {
+    canvas.toBlob(blob => {
+      blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf)));
+    }, 'image/png');
   });
 }
 
@@ -916,10 +963,25 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
     const imgGap = 10;
     const rowGap = 10;
+    const CAPTION_H = 16;
     const imgCount = embeddedImgs.length;
     const IMGS_PER_ROW = imgCount <= 2 ? imgCount : 2;
     const rowCount = Math.ceil(imgCount / IMGS_PER_ROW);
-    const rowH = (imgAreaH - (rowCount - 1) * rowGap) / rowCount;
+    const rowSlotH = (imgAreaH - (rowCount - 1) * rowGap) / rowCount;
+    const rowImgH = rowSlotH - CAPTION_H;
+
+    // 預先渲染備註文字為 PNG
+    status.textContent = '正在處理備註文字…';
+    const captionImgs = [];
+    for (let i = 0; i < imgCount; i++) {
+      const cap = imageFiles[i].caption.trim();
+      if (cap) {
+        const pngBytes = await renderTextPng(cap, 11);
+        captionImgs.push(await outDoc.embedPng(pngBytes));
+      } else {
+        captionImgs.push(null);
+      }
+    }
 
     // 建立輸出頁面
     status.textContent = '正在合成最終頁面…';
@@ -930,7 +992,7 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
       x: MARGIN, y: pdfY, width: pdfW, height: pdfH,
     });
 
-    // 繪製佐證圖片（≤2 張一排；≥3 張每排 2 張，上下排列）
+    // 繪製佐證圖片＋備註（≤2 張一排；≥3 張每排 2 張，上下排列）
     for (let row = 0; row < rowCount; row++) {
       const startIdx = row * IMGS_PER_ROW;
       const endIdx = Math.min(startIdx + IMGS_PER_ROW, imgCount);
@@ -940,8 +1002,8 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
       let dims = [];
       for (let i = startIdx; i < endIdx; i++) {
-        const s = rowH / embeddedImgs[i].height;
-        dims.push({ w: embeddedImgs[i].width * s, h: rowH });
+        const s = rowImgH / embeddedImgs[i].height;
+        dims.push({ w: embeddedImgs[i].width * s, h: rowImgH });
       }
       const totalImgW = dims.reduce((sum, d) => sum + d.w, 0);
       if (totalImgW > availRowW) {
@@ -951,14 +1013,25 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
 
       const thisRowW = dims.reduce((sum, d) => sum + d.w, 0) + totalImgGap;
       let curX = (A4_W - thisRowW) / 2;
-      const slotTopY = imgAreaTop - row * (rowH + rowGap);
+      const slotTopY = imgAreaTop - row * (rowSlotH + rowGap);
 
       for (let i = 0; i < dims.length; i++) {
         const dim = dims[i];
-        const imgY = slotTopY - rowH + (rowH - dim.h) / 2;
+        const imgY = slotTopY - dim.h;
         page.drawImage(embeddedImgs[startIdx + i], {
           x: curX, y: imgY, width: dim.w, height: dim.h,
         });
+
+        const capImg = captionImgs[startIdx + i];
+        if (capImg) {
+          const capScale = Math.min(dim.w / capImg.width, (CAPTION_H - 2) / capImg.height);
+          const cw = capImg.width * capScale;
+          const ch = capImg.height * capScale;
+          const cx = curX + (dim.w - cw) / 2;
+          const cy = imgY - CAPTION_H + (CAPTION_H - ch) / 2;
+          page.drawImage(capImg, { x: cx, y: cy, width: cw, height: ch });
+        }
+
         curX += dim.w + imgGap;
       }
     }
