@@ -886,18 +886,10 @@ document.getElementById('btn-merge').addEventListener('click', async () => {
     const MARGIN = 24;
     const usableW = A4_W - MARGIN * 2;
 
-    // 裁切 PDF：只保留表格區域（上方 52%），去掉下方大片空白
+    // 嵌入請款單 PDF 第一頁（全頁，此 PDF 為 595x420pt 非 A4 全高）
     status.textContent = '正在嵌入請款單頁面…';
     const srcPage = srcDoc.getPages()[0];
-    const { width: srcW, height: srcH } = srcPage.getSize();
-    const cropRatio = 0.52;
-    const cropH = srcH * cropRatio;
-    const embeddedPage = await outDoc.embedPage(srcPage, {
-      left: 0,
-      bottom: srcH - cropH,
-      right: srcW,
-      top: srcH,
-    });
+    const embeddedPage = await outDoc.embedPage(srcPage);
 
     const pdfScale = usableW / embeddedPage.width;
     const pdfW = usableW;
